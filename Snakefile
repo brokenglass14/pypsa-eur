@@ -4,6 +4,7 @@
 
 from pathlib import Path
 import yaml
+import posixpath
 from os.path import normpath, exists, join
 from shutil import copyfile, move, rmtree
 from snakemake.utils import min_version
@@ -39,7 +40,7 @@ benchmarks = path_provider("benchmarks/", RDIR, shared_resources, exclude_from_s
 resources = path_provider("resources/", RDIR, shared_resources, exclude_from_shared)
 
 cutout_dir = config["atlite"]["cutout_directory"]
-CDIR = join(cutout_dir, ("" if run["shared_cutouts"] else RDIR))
+CDIR = posixpath.join(cutout_dir, ("" if run["shared_cutouts"] else RDIR))
 RESULTS = "results/" + RDIR
 
 
