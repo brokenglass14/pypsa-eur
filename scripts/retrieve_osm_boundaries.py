@@ -70,7 +70,13 @@ def retrieve_osm_boundaries(
         """
         try:
             # Send the request
-            response = requests.post(overpass_url, data=op_query)
+            # overpass-api.de rejects the default python-requests User-Agent (406)
+            response = requests.post(
+                overpass_url,
+                data={"data": op_query},
+                headers={"User-Agent": "PyPSA-Eur (https://github.com/PyPSA/pypsa-eur)"},
+                timeout=600,
+            )
             response.raise_for_status()  # Raise HTTPError for bad responses
 
             filepath = output[0]
