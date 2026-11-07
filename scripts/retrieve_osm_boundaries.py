@@ -28,6 +28,16 @@ ADM1_SPECIALS = {
     "XK": 5,
 }
 
+# Public Overpass API instances, tried in order (see
+# https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances)
+OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",  # Germany (main instance)
+    "https://overpass.kumi.systems/api/interpreter",  # Switzerland
+    "https://overpass.private.coffee/api/interpreter",  # Austria
+]
+
+USER_AGENT = "PyPSA-Eur (https://github.com/PyPSA/pypsa-eur)"
+
 
 def retrieve_osm_boundaries(
     country,
@@ -43,77 +53,64 @@ def retrieve_osm_boundaries(
     country : str
         The country code for which the OSM data should be retrieved.
     """
-    # Overpass API endpoint URL
-    overpass_url = "https://overpass-api.de/api/interpreter"
-
     wait_time = 5
 
     osm_adm_level = "4"
     if country in adm1_specials:
         osm_adm_level = adm1_specials[country]  # special case e.g. for Kosovo
 
+    # Build the overpass query
+    op_area = f'area["ISO3166-1"="{country}"]'
+    op_query = f"""
+        [out:json];
+        {op_area}->.searchArea;
+        (
+        relation["boundary"="administrative"]["admin_level"={osm_adm_level}]["name"](area.searchArea);
+        );
+        out body geom;
+    """
+
     retries = 3
     for attempt in range(retries):
-        logger.info(
-            f" - Fetching OSM administrative boundaries for {country} (Attempt {attempt + 1})..."
-        )
-
-        # Build the overpass query
-        op_area = f'area["ISO3166-1"="{country}"]'
-        op_query = f"""
-            [out:json];
-            {op_area}->.searchArea;
-            (
-            relation["boundary"="administrative"]["admin_level"={osm_adm_level}]["name"](area.searchArea);
-            );
-            out body geom;
-        """
-        try:
-            # Send the request
-            # overpass-api.de rejects the default python-requests User-Agent (406)
-            response = requests.post(
-                overpass_url,
-                data={"data": op_query},
-                headers={"User-Agent": "PyPSA-Eur (https://github.com/PyPSA/pypsa-eur)"},
-                timeout=600,
+        # Try each server in turn within one attempt
+        for overpass_url in OVERPASS_URLS:
+            logger.info(
+                f" - Fetching OSM administrative boundaries for {country} from "
+                f"{overpass_url} (attempt {attempt + 1})..."
             )
-            response.raise_for_status()  # Raise HTTPError for bad responses
-
-            filepath = output[0]
-
-            with open(filepath, mode="w") as f:
-                json.dump(response.json(), f, indent=2)
-            logger.info(" - Done.")
-            break  # Exit the retry loop on success
-        except (json.JSONDecodeError, requests.exceptions.RequestException) as e:
-            logger.error(
-                f"Error for retrieving administrative boundaries in country {country}: {e}"
-            )
-            logger.debug(
-                f"Response text: {response.text if response else 'No response'}"
-            )
-            if attempt < retries - 1:
-                wait_time += 15
-                logger.info(f"Waiting {wait_time} seconds before retrying...")
-                time.sleep(wait_time)
-            else:
-                logger.error(
-                    f"Failed to retrieve administrative boundaries in country {country} after {retries} attempts."
+            response = None
+            try:
+                # overpass-api.de rejects the default python-requests User-Agent (406)
+                response = requests.post(
+                    overpass_url,
+                    data={"data": op_query},
+                    headers={"User-Agent": USER_AGENT},
+                    timeout=600,
                 )
-        except Exception as e:
-            # For now, catch any other exceptions and log them. Treat this
-            # the same as a RequestException and try to run again two times.
-            logger.error(
-                f"Unexpected error in retrieving administrative boundaries in country {country}: {e}"
-            )
-            if attempt < retries - 1:
-                wait_time += 10
-                logger.info(f"Waiting {wait_time} seconds before retrying...")
-                time.sleep(wait_time)
-            else:
+                response.raise_for_status()
+                data = response.json()
+
+                with open(output[0], mode="w") as f:
+                    json.dump(data, f, indent=2)
+                logger.info(" - Done.")
+                return
+            except (json.JSONDecodeError, requests.exceptions.RequestException) as e:
                 logger.error(
-                    f"Failed to retrieve administrative boundaries for country {country} after {retries} attempts."
+                    f"Error retrieving administrative boundaries for {country} "
+                    f"from {overpass_url}: {e}"
                 )
+                if response is not None:
+                    logger.debug(f"Response text: {response.text[:1000]}")
+
+        if attempt < retries - 1:
+            wait_time += 15
+            logger.info(f"All servers failed. Waiting {wait_time} seconds before retrying...")
+            time.sleep(wait_time)
+
+    raise RuntimeError(
+        f"Failed to retrieve administrative boundaries for {country} from all "
+        f"Overpass servers after {retries} attempts."
+    )
 
 
 if __name__ == "__main__":

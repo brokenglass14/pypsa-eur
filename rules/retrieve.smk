@@ -665,6 +665,30 @@ if config["enable"]["retrieve"]:
         script:
             "../scripts/retrieve_osm_boundaries.py"
 
+    # Alternative to retrieve_osm_boundaries, see config["adm1_boundaries"]["source"].
+    # URLs are pinned to geoBoundaries gbOpen release commits.
+    GEOBOUNDARIES_ADM1_URLS = {
+        "BA": "https://github.com/wmgeolab/geoBoundaries/raw/90a1d52/releaseData/gbOpen/BIH/ADM1/geoBoundaries-BIH-ADM1.geojson",
+        "MD": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/MDA/ADM1/geoBoundaries-MDA-ADM1.geojson",
+        "UA": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/UKR/ADM1/geoBoundaries-UKR-ADM1.geojson",
+        "XK": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/XKX/ADM1/geoBoundaries-XKX-ADM1.geojson",
+    }
+
+    rule retrieve_geoboundaries_adm1:
+        params:
+            url=lambda w: GEOBOUNDARIES_ADM1_URLS[w.country],
+        output:
+            geojson="data/geoboundaries/{country}_adm1.geojson",
+        log:
+            "logs/retrieve_geoboundaries_{country}_adm1.log",
+        threads: 1
+        retries: 2
+        run:
+            response = requests.get(params.url, timeout=300)
+            response.raise_for_status()
+            with open(output.geojson, "wb") as f:
+                f.write(response.content)
+
     rule retrieve_geothermal_heat_utilisation_potentials:
         input:
             isi_heat_potentials=storage(

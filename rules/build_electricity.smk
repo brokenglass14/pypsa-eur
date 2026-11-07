@@ -104,21 +104,41 @@ rule base_network:
         "../scripts/base_network.py"
 
 
-rule build_osm_boundaries:
-    input:
-        json="data/osm-boundaries/json/{country}_adm1.json",
-        eez=ancient("data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg"),
-    output:
-        boundary="data/osm-boundaries/build/{country}_adm1.geojson",
-    log:
-        "logs/build_osm_boundaries_{country}.log",
-    threads: 1
-    resources:
-        mem_mb=1500,
-    conda:
-        "../envs/environment.yaml"
-    script:
-        "../scripts/build_osm_boundaries.py"
+if config.get("adm1_boundaries", {}).get("source", "overpass") == "geoboundaries":
+
+    rule build_geoboundaries_adm1:
+        input:
+            geojson="data/geoboundaries/{country}_adm1.geojson",
+            eez=ancient("data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg"),
+        output:
+            boundary="data/osm-boundaries/build/{country}_adm1.geojson",
+        log:
+            "logs/build_geoboundaries_adm1_{country}.log",
+        threads: 1
+        resources:
+            mem_mb=1500,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            "../scripts/build_geoboundaries_adm1.py"
+
+else:
+
+    rule build_osm_boundaries:
+        input:
+            json="data/osm-boundaries/json/{country}_adm1.json",
+            eez=ancient("data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg"),
+        output:
+            boundary="data/osm-boundaries/build/{country}_adm1.geojson",
+        log:
+            "logs/build_osm_boundaries_{country}.log",
+        threads: 1
+        resources:
+            mem_mb=1500,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            "../scripts/build_osm_boundaries.py"
 
 
 rule build_shapes:

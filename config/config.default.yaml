@@ -66,6 +66,11 @@ enable:
   retrieve_cutout: true
   drop_leap_day: true
 
+# Source of the regional (adm1) boundaries for non-NUTS countries (BA, MD, UA, XK):
+# 'overpass' (OpenStreetMap via the Overpass API) or 'geoboundaries' (geoboundaries.org)
+adm1_boundaries:
+  source: overpass
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
 co2_budget:
   2020: 0.720 # average emissions of 2019 to 2021 relative to 1990, CO2 excl LULUCF, EEA data, European Environment Agency. (2023a). Annual European Union greenhouse gas inventory 1990–2021 and inventory report 2023 - CRF Table. https://unfccc.int/documents/627830
