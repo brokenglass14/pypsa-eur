@@ -729,18 +729,24 @@ if config["enable"]["retrieve"]:
         output:
             ardeco_gdp="data/jrc-ardeco/ARDECO-SUVGDP.2021.table.csv",
             ardeco_pop="data/jrc-ardeco/ARDECO-SNPTD.2021.table.csv",
+        retries: 2
         run:
             import requests
 
+            # The JRC ARDECO API (moved from urban.jrc.ec.europa.eu to
+            # territorial.ec.europa.eu) returns HTTP 500 for these exports, so
+            # use the PyPSA archive of the 2021 version, as upstream PyPSA-Eur does.
+            base = "https://data.pypsa.org/workflows/eur/jrc_ardeco/2021"
             urls = {
-                "ardeco_gdp": "https://urban.jrc.ec.europa.eu/ardeco-api-v2/rest/export/SUVGDP?version=2021&format=csv-table",
-                "ardeco_pop": "https://urban.jrc.ec.europa.eu/ardeco-api-v2/rest/export/SNPTD?version=2021&format=csv-table",
+                "ardeco_gdp": f"{base}/ARDECO-SUVGDP.2021.table.csv",
+                "ardeco_pop": f"{base}/ARDECO-SNPTD.2021.table.csv",
             }
 
             for key, url in urls.items():
-                response = requests.get(url)
-                output_path = output[key] if key in urls else None
-                if output_path:
-                    with open(output_path, "wb") as f:
-                        f.write(response.content)
+                response = requests.get(url, timeout=300)
+                response.raise_for_status()
+                if not response.content.startswith(b"TERRITORY_ID"):
+                    raise ValueError(f"Unexpected content downloaded from {url}")
+                with open(output[key], "wb") as f:
+                    f.write(response.content)
 
